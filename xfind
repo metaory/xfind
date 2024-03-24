@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -o noclobber  # Avoid overlay files (echo "hi" > foo)
+set -o errexit    # Used to exit upon error, avoiding cascading errors
+set -o pipefail   # Unveils hidden failures
+
+declare -g MAX_DEPTH="${XFIND_MAXDEPTH:-3}"
+declare -g EDITOR="${EDITOR:?NO_EDITOR_SET}"
+declare -g TYPE=f
+declare -g QUERY
+declare -g TOOL
+
+command -v fzf &> /dev/null && TOOL=fzf
+
+[ -z "$TOOL" ] && echo 'NO_TOOL_FOUND: fzf or sk are required' && exit 1
+
+function log {
+  while [ "${1}" ]; do
+    printf '\e[0;35m%*s \e[1;34m%s\n' -10 "$1" "${!1}"
+    shift
+  done
+  printf '\e[0;33m%s\n\n' '---------------'
+}
+
+[[ "$1" =~ ^[0-9]+$ ]] && MAX_DEPTH="$1" && shift
+
+case "${1}" in
+  f|F) TYPE=f; shift;;
+  d|D) TYPE=d; shift;;
+esac
+
+QUERY="$*"
+
+[ -z "$XFIND_SILENT" ] && log TYPE TOOL EDITOR MAX_DEPTH QUERY
+
+find . \
+  -maxdepth "$MAX_DEPTH" \
+  -type "$TYPE" \
+  -not -path ".git*" \
+  -not -path ".local*" \
+  -not -path "*node_modules*" \
+  -name "$QUERY" \
+  | "$TOOL" \
+  --multi \
+  --reverse \
+  --bind "enter:execute(${EDITOR} {+})+deselect-all"
