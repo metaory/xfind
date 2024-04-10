@@ -24,6 +24,12 @@ EXAMPLES
     # find files named xorg with default max depth
 	xfind xorg
 
+	# read from stdin
+	ls | xfind
+
+	# read from stdin
+	git status --short | awk '{print $2}' | xfind
+
 
 ENVIRONMENT VARIABLES
 	XFIND_MAXDEPTH  | default max-depth

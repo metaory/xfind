@@ -11,6 +11,7 @@ declare -g QUERY
 declare -g TOOL
 
 command -v fzf &> /dev/null && TOOL=fzf
+command -v sk &> /dev/null && TOOL=sk
 
 [ -z "$TOOL" ] && echo 'NO_TOOL_FOUND: fzf or sk are required' && exit 1
 
@@ -22,25 +23,46 @@ function log {
   printf '\e[0;33m%s\n\n' '---------------'
 }
 
-[[ "$1" =~ ^[0-9]+$ ]] && MAX_DEPTH="$1" && shift
 
-case "${1}" in
-  f|F) TYPE=f; shift;;
-  d|D) TYPE=d; shift;;
-esac
-
-QUERY="$*"
 
 [ -z "$XFIND_SILENT" ] && log TYPE TOOL EDITOR MAX_DEPTH QUERY
 
-find . \
-  -maxdepth "$MAX_DEPTH" \
-  -type "$TYPE" \
-  -not -path ".git*" \
-  -not -path ".local*" \
-  -not -path "*node_modules*" \
-  -name "$QUERY" \
-  | "$TOOL" \
-  --multi \
-  --reverse \
-  --bind "enter:execute(${EDITOR} {+})+deselect-all"
+declare -a RESULT
+
+function do_search {
+  printf '%s\n' "${RESULT[@]}" | "$TOOL" \
+    --multi \
+    --reverse \
+    --preview='chroma {}' \
+    --bind "enter:execute(${EDITOR} {+})+deselect-all,ctrl-o:toggle-preview"
+
+
+  echo finished search
+}
+
+function do_find {
+  [[ "$1" =~ ^[0-9]+$ ]] && MAX_DEPTH="$1" && shift
+
+  case "${1}" in
+    f|F) TYPE=f; shift;;
+    d|D) TYPE=d; shift;;
+  esac
+
+  QUERY="$*"
+  mapfile -d $'\0' RESULT < <(find . \
+    -maxdepth "$MAX_DEPTH" \
+    -type "$TYPE" \
+    -not -path ".git*" \
+    -not -path ".local*" \
+    -not -path "*node_modules*" \
+    -name "$QUERY" \
+    -print0)
+
+  echo okk
+}
+
+[ ! -t 0 ] && while read -r x ; do RESULT+=( "$x" ); done
+
+! (( ${#RESULT[@]} )) && do_find "$@"
+
+(( ${#RESULT[@]} )) && do_search "${RESULT[@]}"
