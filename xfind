@@ -1,21 +1,37 @@
 #!/bin/bash
 
-set -o noclobber  # Avoid overlay files (echo "hi" > foo)
-set -o errexit    # Used to exit upon error, avoiding cascading errors
-set -o pipefail   # Unveils hidden failures
+# shellcheck disable=SC2068
 
-declare -g MAX_DEPTH="${XFIND_MAXDEPTH:-3}"
+set -o noclobber # Avoid overlay files (echo "hi" > foo)
+set -o errexit   # Used to exit upon error, avoiding cascading errors
+set -o pipefail  # Unveils hidden failures
+
+declare -g DEPTH="${XFIND_MAXDEPTH:-3}"
 declare -g EDITOR="${EDITOR:?NO_EDITOR_SET}"
-declare -g TYPE=f
-declare -g QUERY
+declare -a GNOT=("**git/**" ".local*" "*node_modules*")
+declare -g TYPE=F
+declare -g LIST_ONLY=0
 declare -g TOOL
+declare -g NAME
+declare -A PREVIEW=(
+  [F]='cat {}'
+  [D]='tree -C -L 2 {}'
+)
+declare -r BIND_DEF='ctrl-o:toggle-preview,ctrl-d:preview-page-down,ctrl-u:preview-page-up'
+declare -A BIND_ENTER=(
+  [F]="execute(${EDITOR} {+})+deselect-all"
+  [D]='accept'
+)
 
-command -v fzf &> /dev/null && TOOL=fzf
-command -v sk &> /dev/null && TOOL=sk
+command -v fzf &>/dev/null && TOOL=fzf
+command -v sk &>/dev/null && TOOL=sk
+command -v bat &>/dev/null && PREVIEW[F]='bat {}'
+command -v chroma &>/dev/null && PREVIEW[F]='chroma {}'
 
 [ -z "$TOOL" ] && echo 'NO_TOOL_FOUND: fzf or sk are required' && exit 1
 
 function log {
+  (( XFIND_SILENT )) || (( LIST_ONLY )) && return
   while [ "${1}" ]; do
     printf '\e[0;35m%*s \e[1;34m%s\n' -10 "$1" "${!1}"
     shift
@@ -23,46 +39,79 @@ function log {
   printf '\e[0;33m%s\n\n' '---------------'
 }
 
-
-
-[ -z "$XFIND_SILENT" ] && log TYPE TOOL EDITOR MAX_DEPTH QUERY
-
-declare -a RESULT
-
-function do_search {
+function do_select {
+  (( LIST_ONLY )) && clear && printf '%s\n' "${RESULT[@]}" && exit
+  tmp=$(mktemp)
   printf '%s\n' "${RESULT[@]}" | "$TOOL" \
     --multi \
     --reverse \
-    --preview='chroma {}' \
-    --bind "enter:execute(${EDITOR} {+})+deselect-all,ctrl-o:toggle-preview"
+    --preview="${PREVIEW[${TYPE}]}" \
+    --bind "enter:${BIND_ENTER[${TYPE}]},${BIND_DEF}" | tee "${tmp}" &>/dev/null
+# sk --multi --reverse --preview='cat {}' --bind "enter:execute(${EDITOR} {+})+deselect-all,ctrl-o:toggle-preview,ctrl-d:preview-page-down,ctrl-u:preview-page-up"
 
-
-  echo finished search
+'cat {}'
+  do_find "$tmp"
 }
 
 function do_find {
-  [[ "$1" =~ ^[0-9]+$ ]] && MAX_DEPTH="$1" && shift
+  local DIR
+  if [ -f "$1" ]; then
+    DIR=$(sed -e 's.$./*.' "$1")
+  else
+    DIR="${1:?NO_DIR}"
+  fi
 
-  case "${1}" in
-    f|F) TYPE=f; shift;;
-    d|D) TYPE=d; shift;;
-  esac
+  declare -a RESULT=()
 
-  QUERY="$*"
-  mapfile -d $'\0' RESULT < <(find . \
-    -maxdepth "$MAX_DEPTH" \
-    -type "$TYPE" \
-    -not -path ".git*" \
-    -not -path ".local*" \
-    -not -path "*node_modules*" \
-    -name "$QUERY" \
+  mapfile -t tmp < <(printf "'%s'\n" ${GNOT[@]})
+  mapfile -d ' ' -t args <<<${tmp[@]/#/-not -path }
+  mapfile -d $'\0' RESULT < <(find ${DIR} \
+    -maxdepth "$DEPTH" \
+    -type "${TYPE,,}" \
+    ${args[@]} \
+    -path "${NAME}" \
     -print0)
 
-  echo okk
+  ((${#RESULT[@]})) || {
+    echo -e "\e[31m[ERROR] NO_RESULT\e[0m"
+    exit 1
+  }
+
+  do_select
 }
 
-[ ! -t 0 ] && while read -r x ; do RESULT+=( "$x" ); done
+while [ "$1" ]; do
+  case "${1}" in
+  f[0-9])
+    TYPE=F
+    DEPTH="${1:1}"
+    ;;
+  d[0-9])
+    TYPE=D
+    DEPTH="${1:1}"
+    ;;
+  -not | --not-path) shift; GNOT+=("${1}")
+    ;;
+  -l | --list) LIST_ONLY=1; ;;
+  -h | --help)
+    cat <<-EOM
+		xfind [<TYPE><DEPTH>] [-not|--not-path <GLOB>]... <GLOB>
 
-! (( ${#RESULT[@]} )) && do_find "$@"
+		# find directories with max depth of 3 and one exclude glob and query glob
+		xfind d3 -not '*dist*'  '*repo*'
 
-(( ${#RESULT[@]} )) && do_search "${RESULT[@]}"
+		# find files with max depth of 5 and two exclude glob and query glob
+		xfind f5 -not '*dist*' -not '**/lib/**' '*repo*.js'
+	EOM
+    ;;
+  *) NAME+="${1}" ;;
+  esac
+  shift
+done
+
+[ ! -t 0 ] && while read -r x; do RESULT+=("$x"); done
+
+log TYPE TOOL EDITOR DEPTH NAME
+sleep 0.5
+
+! ((${#RESULT[@]})) && do_find './*'
