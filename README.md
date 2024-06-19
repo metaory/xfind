@@ -1,39 +1,60 @@
-XFIND
-=====
+<div align="center">
+  <h1>X̸FIND</h1>
+  <img src=".github/assets/xfind.png" width="168px"/>
+  <h4>find <FILES> or <DIRS> </h4>
+  <h5>filter with <kbd>SK</kbd> or <kbd>FZF</kbd>, </h5>
+  <h5>preview with <kbd>Chroma</kbd>, <kbd>Bat</kbd> ❘ <kbd>Cat</kbd></h5>
+  <h5>edit with <kbd>EDITOR</kbd></h5>
+  <h4> ··· repeat ··· </h4>
+</div>
 
-```ex
-NAME
-	xfind - search with find, filter with fzf/sk, edit with editor, repeat
+```help
+NAME ~
+	xfind - find <FILES> or <DIRS>, filter with {SK} or {FZF}, preview with {Chroma}, {Bat}, {Cat} and edit with <EDITOR>, repeat;
 
 
-SYNOPSIS
-	xfind [MAX-DEPTH] [F|D] [QUERY]
+SYNOPSIS ~
+	xfind [<TYPE><DEPTH>] [-not|--not-path <GLOB>]... <GLOB>
 
+	find files with max depth of 5 and two exclude glob and query glob >
+	xfind f5 -not '*dist*' -not '**/lib/**' '*repo*.js'
+<
 
-DESCRIPTION
+DESCRIPTION ~
 	find, filter, edit, repeat
+	it will pipe the find result to a {FuzzyTool}
+	it will look for {SK} and fallback to {FZF}
+	for Preview of <FILES> in the {FuzzyTool}, it will look for {Chroma}, {Bat}, {Cat} in that order
+	for Preview of <DIR> in the {FuzzyTool}, it will use Tree
+	on Select the <EDITOR> will be invoked with the Selection
 
+EXAMPLES ~
+	find directories with max depth of 3 and one exclude glob and query glob >
+	xfind d3 -not '*dist*' '*repo*'
+<
 
-EXAMPLES
-    # find files named foo with max depth 2
-	xfind 2 F foo
+	find files with max depth of 5 and two exclude glob and query glob >
+	xfind f5 -not '*dist*' -not '**/lib/**' '*repo*.js'
+<
 
-    # find directories named x11 with default max depth
+	find directories named x11 with default max depth >
 	xfind D x11
+<
 
-    # find files named xorg with default max depth
+	find files named xorg with default max depth >
 	xfind xorg
-
-	# read from stdin
+<
+	read from stdin >
 	ls | xfind
-
-	# read from stdin
+<
+	read from stdin >
 	git status --short | awk '{print $2}' | xfind
+<
 
 
-ENVIRONMENT VARIABLES
+ENVIRONMENT VARIABLES ~
 	XFIND_MAXDEPTH  | default max-depth
-	XFIND_SILENT    | Silent Query & Result prints
+	XFIND_SILENT    | Silent Query & Result Prints (0 or 1)
 
 
 SEE ALSO
@@ -47,6 +68,12 @@ AUTHOR
 CONFIGURATION
 -------------
 
+- `ctrl-o`	toggle-preview
+- `ctrl-n`	next
+- `ctrl-p`	previous
+- `ctrl-d`	preview-page-down
+- `ctrl-u`	preview-page-up
+- `enter`	open in `$EDITOR`
 
 Installation
 ------------
@@ -63,12 +90,13 @@ git clone git@github.com:metaory/xfind.git
 cd xfind
 
 # Give execution permissions
-chmod +x xfind
+chmod +x {xfind}
 
 # Link it somewhere in your PATH
-ln -sfv xfind /usr/bin/xfind
+ln -svf $PWD/xfind /usr/bin/xfind
 
 # Use it anywhere
+xfind f2 '*lib*'
 
 # Usage
 xfind --help
