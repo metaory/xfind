@@ -1,6 +1,6 @@
 <div align="center">
   <img src=".github/assets/xfind.png" width="168px"/>
-  <h1>X̶̶FIND</h1>
+  <h1>X̸FIND</h1>
   <h4>find <FILES> or <DIRS> </h4>
   <h5>filter with <kbd>SK</kbd> or <kbd>FZF</kbd>, </h5>
   <h5>preview with <kbd>Chroma</kbd>, <kbd>Bat</kbd> ❘ <kbd>Cat</kbd></h5>
